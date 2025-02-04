@@ -17,6 +17,31 @@ HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
 }
 
+# List of irrelevant product types related to food allergies
+IRRELEVANT_PRODUCT_TYPES = [
+    "Animal & Veterinary",
+    "Pet Food",
+    "Medicated Feed",
+    "Livestock Feed",
+    "Medical Devices",
+    "Animal Drugs",
+    "Drugs",
+    "Animal Feed",
+    "Cosmetics",
+    "Biologics",
+    "Skin Care Products",
+    "Contaminants",
+    "Dietary Supplements",
+    "Nutritional Supplement",
+    "Generic Drugs",
+    "Over-the-Counter Drugs",
+    "Foodborne Illness",
+    "Tobacco",
+    "Cardiovascular",
+    "General Hospital & Personal Use",
+    "General & Plastic Surgery"
+]
+
 # Function to download images
 def download_image(img_url, folder, filename):
     """Downloads and saves an image correctly."""
@@ -70,14 +95,19 @@ def scrape_fda_recalls():
             recall_url = f"{BASE_URL}{recall_link_tag['href']}"
             scrape_recall_images(brand_name, recall_url)
 
+        product_type = cells[3].text.strip()
+
+        # Filter rows that are not relevant to food allergies (based on irrelevant product types)
+        if any(irrelevant in product_type for irrelevant in IRRELEVANT_PRODUCT_TYPES):
+            continue
+
         recalls.append({
             'Date': cells[0].text.strip(),
             'Brand Name': brand_name,
             'Product Description': cells[2].text.strip(),
-            'Product Type': cells[3].text.strip(),
+            'Product Type': product_type,
             'Recall Reason': cells[4].text.strip(),
             'Company Name': cells[5].text.strip(),
-            #'Terminated Recall': cells[6].text.strip(),
             'Recall Page URL': recall_url
         })
 
