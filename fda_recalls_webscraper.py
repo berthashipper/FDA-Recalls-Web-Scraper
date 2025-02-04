@@ -2,109 +2,102 @@ import requests
 from bs4 import BeautifulSoup
 import csv
 import os
+import re
 
+# Base FDA URL
+BASE_URL = "https://www.fda.gov"
+RECALLS_URL = f"{BASE_URL}/safety/recalls-market-withdrawals-safety-alerts"
 
-## Scrape the FDA Recalls Page
+# Create a directory for images if it doesn't exist
+IMAGE_FOLDER = 'product_images'
+os.makedirs(IMAGE_FOLDER, exist_ok=True)
 
-# Step 1: Send a request to the FDA recalls page
-url = "https://www.fda.gov/safety/recalls-market-withdrawals-safety-alerts"
-response = requests.get(url)
-html_content = response.content
-
-# Step 2: Parse the HTML content using BeautifulSoup
-soup = BeautifulSoup(html_content, 'html.parser')
-
-# Step 3: Find the table containing the recall data
-table = soup.find('table', class_='lcds-datatable')  # Adjust the class name based on the actual HTML structure
-
-# Step 4: Extract the table headers
-headers = []
-for th in table.find_all('th'):
-    headers.append(th.text.strip())
-
-# Step 5: Extract the rows of data
-rows = []
-for tr in table.find_all('tr')[1:]:  # Skip the header row
-    cells = tr.find_all('td')
-    if cells:  # Ensure the row has data
-        row_data = {
-            'Date': cells[0].text.strip(),
-            'Brand Name(s)': cells[1].text.strip(),
-            'Product Description': cells[2].text.strip(),
-            'Product Type': cells[3].text.strip(),
-            'Recall Reason Description': cells[4].text.strip(),
-            'Company Name': cells[5].text.strip(),
-            'Terminated Recall': cells[6].text.strip()
-        }
-        rows.append(row_data)
-
-# Step 6: Write the data to a CSV file
-with open('recalls.csv', 'w', newline='', encoding='utf-8') as csvfile:
-    fieldnames = headers  # Use the headers extracted from the table
-    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-    writer.writeheader()
-    for row in rows:
-        writer.writerow(row)
-
-print("Data has been successfully scraped and saved to recalls.csv.")
-
-
-## Scheduler/Check for New Recalls
-
-# Function to load previously scraped data
-def load_previous_data(filename):
-    if os.path.exists(filename):
-        with open(filename, 'r', newline='', encoding='utf-8') as csvfile:
-            return {row['Date']: row for row in csv.DictReader(csvfile)}
-    return {}
-
-# Function to save new data
-def save_data(filename, rows):
-    with open(filename, 'a', newline='', encoding='utf-8') as csvfile:
-        fieldnames = rows[0].keys()  # Use the keys from the first row as headers
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-        writer.writeheader()
-        for row in rows:
-            writer.writerow(row)
-
-# Main function to scrape the FDA recalls page
-def scrape_fda_recalls():
-    url = "https://www.fda.gov/safety/recalls-market-withdrawals-safety-alerts"
+# Function to download images
+def download_image(url, folder_path, filename):
     response = requests.get(url)
-    html_content = response.content
-    soup = BeautifulSoup(html_content, 'html.parser')
+    if response.status_code == 200:
+        with open(os.path.join(folder_path, filename), 'wb') as f:
+            f.write(response.content)
+        print(f"Downloaded: {filename}")
+    else:
+        print(f"Failed to download: {url}")
 
-    # Find the table containing the recall data
+# Function to scrape recall data and images
+def scrape_fda_recalls():
+    response = requests.get(RECALLS_URL)
+    soup = BeautifulSoup(response.content, 'html.parser')
+
+    # Find the recall table
     table = soup.find('table', class_='lcds-datatable')
-    
-    # Load previously scraped data
-    previous_data = load_previous_data('recalls.csv')
-    new_rows = []
+    if not table:
+        print("Could not find the recall table.")
+        return
 
-    # Extract the rows of data
+    recalls = []
+    
+    # Extract recall data
     for tr in table.find_all('tr')[1:]:  # Skip the header row
         cells = tr.find_all('td')
-        if cells:  # Ensure the row has data
-            row_data = {
-                'Date': cells[0].text.strip(),
-                'Brand Name': cells[1].text.strip(),
-                'Product Description': cells[2].text.strip(),
-                'Product Type': cells[3].text.strip(),
-                'Recall Reason': cells[4].text.strip(),
-                'Company Name': cells[5].text.strip(),
-                'Terminated Recall': cells[6].text.strip(),
-                'Excerpt': cells[7].text.strip(),
-            }
-            # Check if this entry is new
-            if row_data['Date'] not in previous_data:
-                new_rows.append(row_data)
+        if cells:
+            brand_name = cells[1].text.strip()
+            recall_link_tag = cells[1].find('a')
 
-    # Save new data if there are any new entries
-    if new_rows:
-        save_data('recalls.csv', new_rows)
-        print(f"New entries added: {len(new_rows)}")
-    else:
-        print("No new entries found.")
+            if recall_link_tag and 'href' in recall_link_tag.attrs:
+                recall_url = f"{BASE_URL}{recall_link_tag['href']}"
+                
+                # Scrape the recall page for images
+                scrape_recall_images(brand_name, recall_url)
+
+                recalls.append({
+                    'Date': cells[0].text.strip(),
+                    'Brand Name': brand_name,
+                    'Product Description': cells[2].text.strip(),
+                    'Product Type': cells[3].text.strip(),
+                    'Recall Reason': cells[4].text.strip(),
+                    'Company Name': cells[5].text.strip(),
+                    'Terminated Recall': cells[6].text.strip(),
+                    'Recall Page URL': recall_url
+                })
+
+    # Save recalls to CSV
+    save_to_csv(recalls)
+    print("Scraping completed.")
+
+# Function to scrape product images from a recall page
+def scrape_recall_images(brand_name, recall_url):
+    response = requests.get(recall_url)
+    soup = BeautifulSoup(response.content, 'html.parser')
+
+    # Find images
+    images = soup.find_all('img', src=re.compile(r'\.(jpg|jpeg|png|gif)$'))
+    
+    for img in images:
+        img_url = img['src']
+
+        # Handle relative URLs
+        if img_url.startswith('/'):
+            img_url = f"{BASE_URL}{img_url}"
+
+        img_filename = f"{brand_name}_{os.path.basename(img_url)}"
+        img_filename = re.sub(r'[^\w\-_\. ]', '_', img_filename)  # Clean filename
+
+        download_image(img_url, IMAGE_FOLDER, img_filename)
+
+# Function to save recall data to CSV
+def save_to_csv(data, filename='recalls.csv'):
+    if not data:
+        print("No new recalls to save.")
+        return
+
+    fieldnames = data[0].keys()
+
+    with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in data:
+            writer.writerow(row)
+
+    print(f"Recall data saved to {filename}")
 
 # Run the scraper
 scrape_fda_recalls()
