@@ -68,16 +68,20 @@ fda-recall-scraper/
 ```
 
 ### How It Works
-1. **Scraping the Recall Data**
+1. **Scraping the Recall Data**:
+
    The scraper starts by visiting the FDA's recall page and extracting the relevant data from the table containing product recalls. It filters out irrelevant product types (e.g., medical devices, pet food) based on a predefined list.
 
-2. **Downloading Product Images**
+3. **Downloading Product Images**:
+   
    For each relevant recall, the scraper checks if product images are available on the recall page. If images are found, it downloads the largest available image and saves it to the product_images/ folder with a sanitized filename.
 
-3. **Saving Data to CSV**
+5. **Saving Data to CSV**:
+   
    All relevant recall data is saved to a CSV file (recalls.csv). This CSV includes columns for the date, brand name, product description, product type, recall reason, company name, and the URL of the recall page.
 
-4. **Cron Job Scheduler**
+7. **Cron Job Scheduler**:
+   
    A cron job can be set up to periodically run the scraper, ensuring that the CSV file stays up-to-date with the latest recalls. By running the scraper daily (or at any desired interval), the CSV file is updated automatically.
 
 
