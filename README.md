@@ -48,7 +48,7 @@ The scraper will:
 - Filter out irrelevant product types like medical devices and pet food.
 - Download images for relevant recalls (saved in the product_images/ folder).
 - Save the gathered data to a CSV file named recalls.csv.
-- 
+  
 To ensure the data is updated, accessed, and parsed regularly, you can use a cron job to run the scraper periodically. For example, you can set it to run every day at midnight:
 
 1. Open the crontab file by running:
@@ -59,12 +59,13 @@ To ensure the data is updated, accessed, and parsed regularly, you can use a cro
    0 0 * * * /usr/bin/python3 /path/to/fda_recalls_webscraper.py
 
 ### File Structure
+```
 fda-recall-scraper/
 ├── product_images/        # Folder where images will be saved
 ├── recalls.csv            # CSV file storing recall data
 ├── fda_recalls_webscraper.py  # Main script for scraping recall data
 └── README.md              # This readme file
-
+```
 
 ### How It Works
 1. **Scraping the Recall Data**
