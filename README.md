@@ -1,4 +1,4 @@
-# FDA Recall Scraper
+# FDA Allergy Recall Scraper
 
 This project is a web scraper designed to gather recall data from the FDA's recall page, focusing on product recalls related to food allergies. It extracts key information such as the brand name, product description, recall reason, and images (where available) and saves them to a CSV file. The scraper excludes irrelevant product types and downloads relevant product images to a local folder.
 
