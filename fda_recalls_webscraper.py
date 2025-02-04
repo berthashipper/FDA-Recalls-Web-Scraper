@@ -93,7 +93,6 @@ def scrape_fda_recalls():
         recall_url = ""
         if recall_link_tag and 'href' in recall_link_tag.attrs:
             recall_url = f"{BASE_URL}{recall_link_tag['href']}"
-            scrape_recall_images(brand_name, recall_url)
 
         product_type = cells[3].text.strip()
 
@@ -101,6 +100,7 @@ def scrape_fda_recalls():
         if any(irrelevant in product_type for irrelevant in IRRELEVANT_PRODUCT_TYPES):
             continue
 
+        # Save the relevant recall and scrape images for it
         recalls.append({
             'Date': cells[0].text.strip(),
             'Brand Name': brand_name,
@@ -110,6 +110,10 @@ def scrape_fda_recalls():
             'Company Name': cells[5].text.strip(),
             'Recall Page URL': recall_url
         })
+
+        # Only scrape images for relevant recalls
+        if recall_url:
+            scrape_recall_images(brand_name, recall_url)
 
         time.sleep(1)  # Avoid overloading the server
 
