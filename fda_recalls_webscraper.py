@@ -18,17 +18,24 @@ HEADERS = {
 }
 
 # Function to download images
-def download_image(url, folder_path, filename):
-    try:
-        response = requests.get(url, headers=HEADERS, timeout=10)
-        if response.status_code == 200:
-            with open(os.path.join(folder_path, filename), 'wb') as f:
-                f.write(response.content)
-            print(f"Downloaded: {filename}")
-        else:
-            print(f"Failed to download {url} (Status: {response.status_code})")
-    except requests.RequestException as e:
-        print(f"Error downloading {url}: {e}")
+def download_image(img_url, folder, filename):
+    """Downloads and saves an image correctly."""
+    response = requests.get(img_url, stream=True, headers=HEADERS)
+    if response.status_code == 200:
+        file_extension = os.path.splitext(img_url.split("?")[0])[-1]  # Extracts proper file extension
+        if not file_extension:
+            file_extension = ".png"  # Default to PNG if unknown
+        
+        file_path = os.path.join(folder, filename + file_extension)
+
+        # Save image in binary mode
+        with open(file_path, 'wb') as file:
+            for chunk in response.iter_content(1024):
+                file.write(chunk)
+        
+        print(f"Image saved: {file_path}")
+    else:
+        print(f"Failed to download image: {img_url}")
 
 # Function to scrape recall data and images
 def scrape_fda_recalls():
@@ -70,7 +77,7 @@ def scrape_fda_recalls():
             'Product Type': cells[3].text.strip(),
             'Recall Reason': cells[4].text.strip(),
             'Company Name': cells[5].text.strip(),
-            'Terminated Recall': cells[6].text.strip(),
+            #'Terminated Recall': cells[6].text.strip(),
             'Recall Page URL': recall_url
         })
 
@@ -82,7 +89,7 @@ def scrape_fda_recalls():
 
 # Function to scrape product images from a recall page
 def scrape_recall_images(brand_name, recall_url):
-    response = requests.get(recall_url)
+    response = requests.get(recall_url, headers=HEADERS)
     soup = BeautifulSoup(response.content, 'html.parser')
 
     # Locate the recall photos section
@@ -91,20 +98,28 @@ def scrape_recall_images(brand_name, recall_url):
         print(f"No product images found for {brand_name}.")
         return
 
-    # Extract images from <img> inside <picture>
-    images = recall_photos_section.find_all('img')
+    # Extract images from <picture> sources
+    images = recall_photos_section.find_all('picture')
 
-    for img in images:
-        img_url = img['src']
+    for picture in images:
+        source_tags = picture.find_all('source')
 
-        # Convert relative URLs to absolute URLs
-        if img_url.startswith('/'):
-            img_url = f"{BASE_URL}{img_url}"
+        if source_tags:
+            # Get the last (largest) available image
+            largest_source = source_tags[-1]['srcset'].split(" ")[0]
 
-        img_filename = f"{brand_name}_{os.path.basename(img_url)}"
-        img_filename = re.sub(r'[^\w\-_\. ]', '_', img_filename)  # Sanitize filename
+            # Convert relative URLs to absolute URLs
+            if largest_source.startswith('/'):
+                img_url = f"{BASE_URL}{largest_source}"
+            else:
+                img_url = largest_source
 
-        download_image(img_url, IMAGE_FOLDER, img_filename)
+            # Generate a clean filename
+            img_filename = f"{brand_name}_image"
+            img_filename = re.sub(r'[^\w\-_\. ]', '_', img_filename)  # Sanitize filename
+
+            # Download the image
+            download_image(img_url, IMAGE_FOLDER, img_filename)
 
 # Function to save recall data to CSV
 def save_to_csv(data, filename='recalls.csv'):
