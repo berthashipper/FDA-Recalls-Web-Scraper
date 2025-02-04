@@ -86,5 +86,5 @@ fda-recall-scraper/
 - BeautifulSoup for parsing HTML data.
 - Requests for making HTTP requests.
 
-Contact
-For any questions, please contact me via berthashipper@gmail.com.
+### Contact
+With any questions, contact me via berthashipper@gmail.com.
