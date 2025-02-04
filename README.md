@@ -37,7 +37,7 @@ To use the scraper, you'll need Python 3.8 or higher and the following dependenc
    ```bash
    python fda_recalls_webscraper.py
 
-The scraper will:
+### The scraper will:
 - Visit the FDA recall page.
 - Extract relevant recall data, such as:
   - Date of recall
