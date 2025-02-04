@@ -4,7 +4,7 @@ import csv
 import os
 
 
-## Scrape the FDA recalls page
+## Scrape the FDA Recalls Page
 
 # Step 1: Send a request to the FDA recalls page
 url = "https://www.fda.gov/safety/recalls-market-withdrawals-safety-alerts"
@@ -49,7 +49,7 @@ with open('recalls.csv', 'w', newline='', encoding='utf-8') as csvfile:
 print("Data has been successfully scraped and saved to recalls.csv.")
 
 
-## Scheduler/Check for new recalls
+## Scheduler/Check for New Recalls
 
 # Function to load previously scraped data
 def load_previous_data(filename):
