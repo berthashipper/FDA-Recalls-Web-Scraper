@@ -62,6 +62,15 @@ def download_image(img_url, folder, filename):
     else:
         print(f"Failed to download image: {img_url}")
 
+def generate_caption(recall):
+    """Generates a formatted caption for Instagram posts based on recall details."""
+    return (f"🚨 **Recall Alert!** 🚨\n"
+            f"{recall['Brand Name']} is recalling **{recall['Product Description']}** "
+            f"due to **{recall['Recall Reason']}**.\n"
+            f"Full details and product images are available at the link below.\n\n"
+            f"🔗 More info: {recall['Recall Page URL']}"
+            f"#FoodRecall #AllergyAlert #SafetyFirst\n\n")
+
 # Function to scrape recall data and images
 def scrape_fda_recalls():
     try:
@@ -73,7 +82,6 @@ def scrape_fda_recalls():
 
     soup = BeautifulSoup(response.content, 'html.parser')
 
-    # Find the recall table
     table = soup.find('table', class_='lcds-datatable')
     if not table:
         print("Could not find the recall table.")
@@ -81,11 +89,10 @@ def scrape_fda_recalls():
 
     recalls = []
     
-    # Extract recall data
-    for tr in table.find_all('tr')[1:]:  # Skip the header row
+    for tr in table.find_all('tr')[1:]:  
         cells = tr.find_all('td')
         if len(cells) < 7:
-            continue  # Skip rows with missing data
+            continue  
         
         brand_name = cells[1].text.strip()
         recall_link_tag = cells[1].find('a')
@@ -96,12 +103,10 @@ def scrape_fda_recalls():
 
         product_type = cells[3].text.strip()
 
-        # Filter rows that are not relevant to food allergies (based on irrelevant product types)
         if any(irrelevant in product_type for irrelevant in IRRELEVANT_PRODUCT_TYPES):
             continue
 
-        # Save the relevant recall and scrape images for it
-        recalls.append({
+        recall_entry = {
             'Date': cells[0].text.strip(),
             'Brand Name': brand_name,
             'Product Description': cells[2].text.strip(),
@@ -109,15 +114,18 @@ def scrape_fda_recalls():
             'Recall Reason': cells[4].text.strip(),
             'Company Name': cells[5].text.strip(),
             'Recall Page URL': recall_url
-        })
+        }
 
-        # Only scrape images for relevant recalls
+        # Generate caption and add to the recall entry
+        recall_entry['Caption'] = generate_caption(recall_entry)
+
+        recalls.append(recall_entry)
+
         if recall_url:
             scrape_recall_images(brand_name, recall_url)
 
-        time.sleep(1)  # Avoid overloading the server
+        time.sleep(1)  
 
-    # Save recalls to CSV
     save_to_csv(recalls)
     print("Scraping completed.")
 
@@ -161,7 +169,7 @@ def save_to_csv(data, filename='recalls.csv'):
         print("No new recalls to save.")
         return
 
-    fieldnames = data[0].keys()
+    fieldnames = list(data[0].keys())
 
     with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
