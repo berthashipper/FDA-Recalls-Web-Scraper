@@ -19,57 +19,57 @@ HEADERS = {
 
 # List of irrelevant product types related to food allergies
 IRRELEVANT_PRODUCT_TYPES = [
-    "Animal & Veterinary",
-    "Pet Food",
-    "Medicated Feed",
-    "Livestock Feed",
-    "Medical Devices",
-    "Animal Drugs",
-    "Drugs",
-    "Animal Feed",
-    "Cosmetics",
-    "Biologics",
-    "Skin Care Products",
-    "Contaminants",
-    "Dietary Supplements",
-    "Nutritional Supplement",
-    "Generic Drugs",
-    "Over-the-Counter Drugs",
-    "Foodborne Illness",
-    "Tobacco",
-    "Cardiovascular",
-    "General Hospital & Personal Use",
-    "General & Plastic Surgery"
+    "Animal & Veterinary", "Pet Food", "Medicated Feed", "Livestock Feed", "Medical Devices", 
+    "Animal Drugs", "Drugs", "Animal Feed", "Cosmetics", "Biologics", "Skin Care Products", 
+    "Contaminants", "Dietary Supplements", "Nutritional Supplement", "Generic Drugs", 
+    "Over-the-Counter Drugs", "Foodborne Illness", "Tobacco", "Cardiovascular", 
+    "General Hospital & Personal Use", "General & Plastic Surgery"
 ]
+
+# Function to generate caption
+ALWAYS_INCLUDED_HASHTAGS = "#FigApp #DietaryRestrictions #FoodAllergies #FoodAllergy #FoodIntolerances"
+
+def generate_caption(recall):
+    """Generates a smooth and accurate recall caption, with relevant hashtags."""
+    brand_name = recall.get('Brand Name')
+    product_description = recall.get('Product Description')
+    recall_reason = recall.get('Recall Reason')
+    recall_url = recall.get('Recall Page URL')
+    
+    # Process recall reason for a clean caption
+    if "due to" in recall_reason.lower():
+        recall_reason = f"due to {recall_reason.split('due to')[1].strip()}"
+    
+    safety_advice = "Please check the product details to determine if you are affected."
+    
+    caption = (
+        f"🚨 Recall Alert! 🚨\n"
+        f"{brand_name} is recalling {product_description} {recall_reason}. {safety_advice}\n"
+        f"🔗 More info: {recall_url}\n"
+    )
+
+    hashtags = []
+    if "milk" in recall_reason.lower(): hashtags.append("#MilkAllergy")
+    if "peanut" in recall_reason.lower(): hashtags.append("#PeanutAllergy")
+    if "egg" in recall_reason.lower(): hashtags.append("#EggAllergy")
+    hashtags.append(ALWAYS_INCLUDED_HASHTAGS)
+
+    caption += " ".join(hashtags)
+    return caption.strip()
 
 # Function to download images
 def download_image(img_url, folder, filename):
     """Downloads and saves an image correctly."""
     response = requests.get(img_url, stream=True, headers=HEADERS)
     if response.status_code == 200:
-        file_extension = os.path.splitext(img_url.split("?")[0])[-1]  # Extracts proper file extension
-        if not file_extension:
-            file_extension = ".png"  # Default to PNG if unknown
-        
+        file_extension = os.path.splitext(img_url.split("?")[0])[-1] or ".png"
         file_path = os.path.join(folder, filename + file_extension)
-
-        # Save image in binary mode
         with open(file_path, 'wb') as file:
             for chunk in response.iter_content(1024):
                 file.write(chunk)
-        
         print(f"Image saved: {file_path}")
     else:
         print(f"Failed to download image: {img_url}")
-
-def generate_caption(recall):
-    """Generates a formatted caption for Instagram posts based on recall details."""
-    return (f"🚨 **Recall Alert!** 🚨\n"
-            f"{recall['Brand Name']} is recalling **{recall['Product Description']}** "
-            f"due to **{recall['Recall Reason']}**.\n"
-            f"Full details and product images are available at the link below.\n\n"
-            f"🔗 More info: {recall['Recall Page URL']}"
-            f"#FoodRecall #AllergyAlert #SafetyFirst\n\n")
 
 # Function to scrape recall data and images
 def scrape_fda_recalls():
@@ -81,26 +81,20 @@ def scrape_fda_recalls():
         return
 
     soup = BeautifulSoup(response.content, 'html.parser')
-
     table = soup.find('table', class_='lcds-datatable')
     if not table:
         print("Could not find the recall table.")
         return
 
     recalls = []
-    
-    for tr in table.find_all('tr')[1:]:  
+    for tr in table.find_all('tr')[1:]:
         cells = tr.find_all('td')
         if len(cells) < 7:
-            continue  
-        
+            continue
+
         brand_name = cells[1].text.strip()
         recall_link_tag = cells[1].find('a')
-
-        recall_url = ""
-        if recall_link_tag and 'href' in recall_link_tag.attrs:
-            recall_url = f"{BASE_URL}{recall_link_tag['href']}"
-
+        recall_url = f"{BASE_URL}{recall_link_tag['href']}" if recall_link_tag else ""
         product_type = cells[3].text.strip()
 
         if any(irrelevant in product_type for irrelevant in IRRELEVANT_PRODUCT_TYPES):
@@ -115,16 +109,12 @@ def scrape_fda_recalls():
             'Company Name': cells[5].text.strip(),
             'Recall Page URL': recall_url
         }
-
-        # Generate caption and add to the recall entry
         recall_entry['Caption'] = generate_caption(recall_entry)
-
         recalls.append(recall_entry)
 
         if recall_url:
             scrape_recall_images(brand_name, recall_url)
-
-        time.sleep(1)  
+        time.sleep(1)
 
     save_to_csv(recalls)
     print("Scraping completed.")
@@ -134,50 +124,37 @@ def scrape_recall_images(brand_name, recall_url):
     response = requests.get(recall_url, headers=HEADERS)
     soup = BeautifulSoup(response.content, 'html.parser')
 
-    # Locate the recall photos section
     recall_photos_section = soup.find('div', id='recall-photos')
     if not recall_photos_section:
         print(f"No product images found for {brand_name}.")
         return
 
-    # Extract images from <picture> sources
     images = recall_photos_section.find_all('picture')
+    largest_image_dict = {}  # Store the largest image URLs
 
     for picture in images:
         source_tags = picture.find_all('source')
+        for source in source_tags:
+            img_url = source['srcset'].split(" ")[0]  # Extract URL
+            img_width = int(source['srcset'].split(" ")[-1].replace('w', ''))  # Get width
 
-        if source_tags:
-            # Get the last (largest) available image
-            largest_source = source_tags[-1]['srcset'].split(" ")[0]
+            if img_url.startswith('/'):
+                img_url = f"{BASE_URL}{img_url}"
 
-            # Convert relative URLs to absolute URLs
-            if largest_source.startswith('/'):
-                img_url = f"{BASE_URL}{largest_source}"
-            else:
-                img_url = largest_source
+            base_url = img_url.split("?")[0]  # Remove query parameters
+            if base_url not in largest_image_dict or img_width > largest_image_dict[base_url][1]:
+                largest_image_dict[base_url] = (img_url, img_width)
 
-            # Generate a clean filename
-            img_filename = f"{brand_name}_image"
-            img_filename = re.sub(r'[^\w\-_\. ]', '_', img_filename)  # Sanitize filename
+    # Download the largest images
+    for index, (img_url, _) in enumerate(largest_image_dict.values(), start=1):
+        img_filename = f"{brand_name}_image_{index}"
+        img_filename = re.sub(r'[^\w\-_\. ]', '_', img_filename)  # Sanitize filename
+        download_image(img_url, IMAGE_FOLDER, img_filename)
 
-            # Download the image
-            download_image(img_url, IMAGE_FOLDER, img_filename)
-
-# Function to save recall data to CSV
-def save_to_csv(data, filename='recalls.csv'):
-    if not data:
-        print("No new recalls to save.")
-        return
-
-    fieldnames = list(data[0].keys())
-
-    with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-        writer.writeheader()
-        for row in data:
-            writer.writerow(row)
-
-    print(f"Recall data saved to {filename}")
+    if largest_image_dict:
+        print(f"Downloaded {len(largest_image_dict)} unique largest images for {brand_name}.")
+    else:
+        print(f"No unique images to download for {brand_name}.")
 
 # Run the scraper
 scrape_fda_recalls()
